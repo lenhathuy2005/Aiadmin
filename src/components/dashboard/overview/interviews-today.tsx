@@ -1,0 +1,51 @@
+import * as React from 'react';
+import Avatar from '@mui/material/Avatar';
+import Card from '@mui/material/Card';
+import CardContent from '@mui/material/CardContent';
+import Stack from '@mui/material/Stack';
+import type { SxProps } from '@mui/material/styles';
+import Typography from '@mui/material/Typography';
+import { ArrowUpIcon } from '@phosphor-icons/react/dist/ssr/ArrowUp';
+import { CalendarIcon } from '@phosphor-icons/react/dist/ssr/Calendar';
+
+export interface InterviewsTodayProps {
+  diff?: number;
+  trend: 'up' | 'down';
+  sx?: SxProps;
+  value: string;
+}
+
+export function InterviewsToday({ diff, sx, value }: InterviewsTodayProps): React.JSX.Element {
+  const trendColor = 'var(--mui-palette-success-main)';
+
+  return (
+    <Card sx={sx}>
+      <CardContent>
+        <Stack spacing={2}>
+          <Stack direction="row" sx={{ alignItems: 'flex-start', justifyContent: 'space-between' }} spacing={3}>
+            <Stack spacing={1}>
+              <Typography color="text.secondary" variant="overline">
+                Phỏng vấn hôm nay
+              </Typography>
+              <Typography variant="h4">{value}</Typography>
+            </Stack>
+            <Avatar sx={{ backgroundColor: '#9c27b0', height: '56px', width: '56px' }}>
+              <CalendarIcon fontSize="var(--icon-fontSize-lg)" />
+            </Avatar>
+          </Stack>
+          {diff ? (
+            <Stack sx={{ alignItems: 'center' }} direction="row" spacing={2}>
+              <Stack sx={{ alignItems: 'center' }} direction="row" spacing={0.5}>
+                <ArrowUpIcon color={trendColor} fontSize="var(--icon-fontSize-md)" />
+                <Typography color={trendColor} variant="body2">
+                  +{diff}%
+                </Typography>
+              </Stack>
+            </Stack>
+          ) : null}
+        </Stack>
+      </CardContent>
+    </Card>
+  );
+}
+
