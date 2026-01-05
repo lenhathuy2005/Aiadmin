@@ -472,6 +472,7 @@ export default function UsersManagementPage() {
                 </Typography>
                 <Select value={plan} onChange={(e) => setPlan(e.target.value as UserPlan)}>
                   <MenuItem value="Free">Free</MenuItem>
+                  <MenuItem value="Pro">Pro</MenuItem>
                   <MenuItem value="Premium">Premium</MenuItem>
                 </Select>
               </FormControl>
