@@ -1,9 +1,12 @@
-"use client";
+'use client';
 
-import * as React from "react";
+import * as React from 'react';
 import {
+  Avatar,
   Box,
   Button,
+  Card,
+  CardContent,
   Chip,
   Dialog,
   DialogContent,
@@ -13,236 +16,271 @@ import {
   Grid,
   IconButton,
   MenuItem,
-  Paper,
   Select,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
+  SelectChangeEvent,
+  Stack,
   Typography,
-} from "@mui/material";
+} from '@mui/material';
 
-type PaymentStatus = "success" | "pending" | "failed";
-type Method = "Momo" | "Banking" | "VNPay";
+import MonetizationOnRoundedIcon from '@mui/icons-material/MonetizationOnRounded';
+import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
+import HourglassTopRoundedIcon from '@mui/icons-material/HourglassTopRounded';
+import CancelRoundedIcon from '@mui/icons-material/CancelRounded';
+import VisibilityRoundedIcon from '@mui/icons-material/VisibilityRounded';
+import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
 
-type StatusFilter = "all" | PaymentStatus;
+type PaymentStatus = 'success' | 'pending' | 'failed';
+type PaymentMethod = 'momo' | 'banking' | 'vnpay';
 
-type Payment = {
+type PaymentPlan = 'Free' | 'Premium Monthly' | 'Premium Yearly';
+
+interface PaymentRow {
   id: string;
   userName: string;
-  packageName: string;
-  amount: number; // VND
-  method: Method;
+  plan: PaymentPlan;
+  amountVnd: number;
+  method: PaymentMethod;
   status: PaymentStatus;
   date: string; // dd/MM/yyyy
-  // dữ liệu để hiện modal
-  transactionCode: string;
   email: string;
   phone: string;
-};
-
-const PAYMENTS: Payment[] = [
-  {
-    id: "1",
-    userName: "Nguyễn Văn A",
-    packageName: "Premium Monthly",
-    amount: 299000,
-    method: "Momo",
-    status: "success",
-    date: "28/01/2024",
-    transactionCode: "TXN001234567",
-    email: "nguyenvana@email.com",
-    phone: "0901234567",
-  },
-  {
-    id: "2",
-    userName: "Trần Thị B",
-    packageName: "Premium Yearly",
-    amount: 2990000,
-    method: "Banking",
-    status: "success",
-    date: "27/01/2024",
-    transactionCode: "TXN001234568",
-    email: "tranthib@email.com",
-    phone: "0912345678",
-  },
-  {
-    id: "3",
-    userName: "Lê Văn C",
-    packageName: "Premium Monthly",
-    amount: 299000,
-    method: "VNPay",
-    status: "pending",
-    date: "27/01/2024",
-    transactionCode: "TXN001234569",
-    email: "levanc@email.com",
-    phone: "0923456789",
-  },
-  {
-    id: "4",
-    userName: "Phạm Thị D",
-    packageName: "Premium Monthly",
-    amount: 299000,
-    method: "Momo",
-    status: "failed",
-    date: "26/01/2024",
-    transactionCode: "TXN001234570",
-    email: "phamthid@email.com",
-    phone: "0934567890",
-  },
-  {
-    id: "5",
-    userName: "Hoàng Văn E",
-    packageName: "Premium Yearly",
-    amount: 2990000,
-    method: "Banking",
-    status: "success",
-    date: "26/01/2024",
-    transactionCode: "TXN001234571",
-    email: "hoangvane@email.com",
-    phone: "0945678901",
-  },
-];
-
-function formatVND(amount: number) {
-  return new Intl.NumberFormat("vi-VN").format(amount) + "đ";
 }
 
-function initials(name: string) {
+function formatVnd(amount: number): string {
+  // hiển thị dạng 299,000đ (đúng style trong ảnh)
+  const s = new Intl.NumberFormat('vi-VN').format(amount);
+  return `${s}đ`;
+}
+
+function initialsFromName(name: string): string {
   const parts = name.trim().split(/\s+/);
-  const a = parts[0]?.[0] ?? "";
-  const b = parts[parts.length - 1]?.[0] ?? "";
+  const a = parts[0]?.[0] ?? '';
+  const b = parts[parts.length - 1]?.[0] ?? '';
   return (a + b).toUpperCase();
 }
 
-function statusChip(status: PaymentStatus) {
-  if (status === "success") {
-    return {
-      label: "Thành công",
-      sx: {
-        bgcolor: "rgba(16,185,129,.15)",
-        color: "rgb(16,185,129)",
-        fontWeight: 700,
-      },
-    };
-  }
-  if (status === "pending") {
-    return {
-      label: "Đang chờ",
-      sx: {
-        bgcolor: "rgba(245,158,11,.15)",
-        color: "rgb(245,158,11)",
-        fontWeight: 700,
-      },
-    };
-  }
-  return {
-    label: "Thất bại",
-    sx: {
-      bgcolor: "rgba(239,68,68,.15)",
-      color: "rgb(239,68,68)",
+const STATUS_META: Record<
+  PaymentStatus,
+  { label: string; chipSx: any; icon: React.ReactNode }
+> = {
+  success: {
+    label: 'Thành công',
+    chipSx: {
+      bgcolor: 'rgba(46, 204, 113, 0.15)',
+      color: '#0f7a3c',
       fontWeight: 700,
+      border: '1px solid rgba(46, 204, 113, 0.25)',
     },
-  };
-}
-
-function methodChip(method: Method) {
-  // style giống “pill” tím trong ảnh
-  return {
-    label: method,
-    sx: {
-      bgcolor: "rgba(168,85,247,.12)",
-      color: "rgb(147,51,234)",
+    icon: <CheckCircleRoundedIcon sx={{ fontSize: 18 }} />,
+  },
+  pending: {
+    label: 'Đang chờ',
+    chipSx: {
+      bgcolor: 'rgba(243, 156, 18, 0.15)',
+      color: '#8a5a00',
       fontWeight: 700,
+      border: '1px solid rgba(243, 156, 18, 0.25)',
     },
-  };
-}
+    icon: <HourglassTopRoundedIcon sx={{ fontSize: 18 }} />,
+  },
+  failed: {
+    label: 'Thất bại',
+    chipSx: {
+      bgcolor: 'rgba(231, 76, 60, 0.12)',
+      color: '#a11b10',
+      fontWeight: 700,
+      border: '1px solid rgba(231, 76, 60, 0.22)',
+    },
+    icon: <CancelRoundedIcon sx={{ fontSize: 18 }} />,
+  },
+};
 
-function metricCard(title: string, value: string, iconBg: string, icon: string) {
+const METHOD_META: Record<PaymentMethod, { label: string; sx: any }> = {
+  momo: {
+    label: 'Momo',
+    sx: {
+      bgcolor: 'rgba(155, 89, 182, 0.12)',
+      color: '#6d2b86',
+      fontWeight: 700,
+      border: '1px solid rgba(155, 89, 182, 0.22)',
+    },
+  },
+  banking: {
+    label: 'Banking',
+    sx: {
+      bgcolor: 'rgba(155, 89, 182, 0.12)',
+      color: '#6d2b86',
+      fontWeight: 700,
+      border: '1px solid rgba(155, 89, 182, 0.22)',
+    },
+  },
+  vnpay: {
+    label: 'VNPay',
+    sx: {
+      bgcolor: 'rgba(155, 89, 182, 0.12)',
+      color: '#6d2b86',
+      fontWeight: 700,
+      border: '1px solid rgba(155, 89, 182, 0.22)',
+    },
+  },
+};
+
+function StatCard(props: {
+  title: string;
+  value: React.ReactNode;
+  icon: React.ReactNode;
+  iconBg: string;
+  iconFg?: string;
+}) {
+  const { title, value, icon, iconBg, iconFg } = props;
+
   return (
-    <Paper
-      variant="outlined"
-      sx={{
-        p: 2,
-        borderRadius: 2,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        height: "100%",
-      }}
-    >
-      <Box>
-        <Typography variant="body2" color="text.secondary">
-          {title}
-        </Typography>
-        <Typography variant="h5" sx={{ fontWeight: 800, mt: 0.5 }}>
-          {value}
-        </Typography>
-      </Box>
+    <Card sx={{ borderRadius: 3 }}>
+      <CardContent sx={{ p: 2.5 }}>
+        <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2}>
+          <Box sx={{ minWidth: 0 }}>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+              {title}
+            </Typography>
+            <Typography variant="h5" sx={{ fontWeight: 800, lineHeight: 1.1 }}>
+              {value}
+            </Typography>
+          </Box>
 
-      <Box
-        sx={{
-          width: 44,
-          height: 44,
-          borderRadius: 2,
-          bgcolor: iconBg,
-          display: "grid",
-          placeItems: "center",
-          color: "#fff",
-          fontSize: 18,
-          fontWeight: 900,
-        }}
-      >
-        {icon}
-      </Box>
-    </Paper>
+          {/* ✅ Fix icon lệch: box cố định + svg display block */}
+          <Box
+            sx={{
+              width: 40,
+              height: 40,
+              borderRadius: 2,
+              backgroundColor: iconBg,
+              color: iconFg ?? 'inherit',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+              '& svg': { display: 'block' },
+            }}
+          >
+            {icon}
+          </Box>
+        </Stack>
+      </CardContent>
+    </Card>
   );
 }
 
-export default function PaymentsManagementPage() {
-  const [filter, setFilter] = React.useState<StatusFilter>("all");
-
-  // paging đơn giản (giống ảnh: 5 dòng)
-  const pageSize = 5;
+export default function PaymentsManagementPage(): React.JSX.Element {
+  const [statusFilter, setStatusFilter] = React.useState<'all' | PaymentStatus>('all');
   const [page, setPage] = React.useState(1);
+  const rowsPerPage = 5;
 
-  // modal xem chi tiết
-  const [open, setOpen] = React.useState(false);
-  const [selected, setSelected] = React.useState<Payment | null>(null);
+  const [openDetail, setOpenDetail] = React.useState(false);
+  const [selected, setSelected] = React.useState<PaymentRow | null>(null);
+
+  const payments: PaymentRow[] = React.useMemo(
+    () => [
+      {
+        id: 'TXN001234567',
+        userName: 'Nguyễn Văn A',
+        plan: 'Premium Monthly',
+        amountVnd: 299000,
+        method: 'momo',
+        status: 'success',
+        date: '28/01/2024',
+        email: 'nguyenvana@email.com',
+        phone: '0901234567',
+      },
+      {
+        id: 'TXN001234568',
+        userName: 'Trần Thị B',
+        plan: 'Premium Yearly',
+        amountVnd: 2990000,
+        method: 'banking',
+        status: 'success',
+        date: '27/01/2024',
+        email: 'tranthib@email.com',
+        phone: '0902345678',
+      },
+      {
+        id: 'TXN001234569',
+        userName: 'Lê Văn C',
+        plan: 'Premium Monthly',
+        amountVnd: 299000,
+        method: 'vnpay',
+        status: 'pending',
+        date: '27/01/2024',
+        email: 'levanc@email.com',
+        phone: '0903456789',
+      },
+      {
+        id: 'TXN001234570',
+        userName: 'Phạm Thị D',
+        plan: 'Premium Monthly',
+        amountVnd: 299000,
+        method: 'momo',
+        status: 'failed',
+        date: '26/01/2024',
+        email: 'phamthid@email.com',
+        phone: '0904567890',
+      },
+      {
+        id: 'TXN001234571',
+        userName: 'Hoàng Văn E',
+        plan: 'Premium Yearly',
+        amountVnd: 2990000,
+        method: 'banking',
+        status: 'success',
+        date: '26/01/2024',
+        email: 'hoangvane@email.com',
+        phone: '0905678901',
+      },
+    ],
+    []
+  );
 
   const filtered = React.useMemo(() => {
-    const base = filter === "all" ? PAYMENTS : PAYMENTS.filter((p) => p.status === filter);
-    return base;
-  }, [filter]);
+    if (statusFilter === 'all') return payments;
+    return payments.filter((p) => p.status === statusFilter);
+  }, [payments, statusFilter]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const totalRevenue = React.useMemo(() => {
+    // theo ảnh: Tổng doanh thu thường tính từ giao dịch thành công
+    return payments
+      .filter((p) => p.status === 'success')
+      .reduce((sum, p) => sum + p.amountVnd, 0);
+  }, [payments]);
+
+  const countSuccess = React.useMemo(() => payments.filter((p) => p.status === 'success').length, [payments]);
+  const countPending = React.useMemo(() => payments.filter((p) => p.status === 'pending').length, [payments]);
+  const countFailed = React.useMemo(() => payments.filter((p) => p.status === 'failed').length, [payments]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / rowsPerPage));
   const safePage = Math.min(page, totalPages);
-
   const paged = React.useMemo(() => {
-    const start = (safePage - 1) * pageSize;
-    return filtered.slice(start, start + pageSize);
+    const start = (safePage - 1) * rowsPerPage;
+    return filtered.slice(start, start + rowsPerPage);
   }, [filtered, safePage]);
 
-  React.useEffect(() => {
+  const handleChangeFilter = (e: SelectChangeEvent) => {
+    const val = e.target.value as any;
+    setStatusFilter(val);
     setPage(1);
-  }, [filter]);
-
-  const handleOpenReceipt = (p: Payment) => {
-    setSelected(p);
-    setOpen(true);
   };
 
-  const handleCloseReceipt = () => {
-    setOpen(false);
+  const openView = (row: PaymentRow) => {
+    setSelected(row);
+    setOpenDetail(true);
+  };
+
+  const closeView = () => {
+    setOpenDetail(false);
     setSelected(null);
   };
 
   return (
-    <Box sx={{ p: 3 }}>
-      {/* Header */}
-      <Box sx={{ mb: 2 }}>
+    <Box sx={{ width: '100%' }}>
+      <Box sx={{ mb: 3 }}>
         <Typography variant="h4" sx={{ fontWeight: 900, mb: 0.5 }}>
           Quản lý Thanh toán
         </Typography>
@@ -251,308 +289,343 @@ export default function PaymentsManagementPage() {
         </Typography>
       </Box>
 
-      {/* Metric cards */}
-      <Grid container spacing={2} sx={{ mb: 3 }}>
+      {/* Stats */}
+      <Grid container spacing={2} sx={{ mb: 2.5 }}>
         <Grid item xs={12} md={3}>
-          {metricCard("Tổng doanh thu", "₫125.4M", "rgb(16,185,129)", "₫")}
+          <StatCard
+            title="Tổng doanh thu"
+            value={formatVnd(totalRevenue)}
+            icon={<MonetizationOnRoundedIcon sx={{ fontSize: 20 }} />}
+            iconBg="rgba(46, 204, 113, 0.18)"
+            iconFg="#0f7a3c"
+          />
         </Grid>
         <Grid item xs={12} md={3}>
-          {metricCard("Giao dịch thành công", "1,247", "rgb(59,130,246)", "✓")}
+          <StatCard
+            title="Giao dịch thành công"
+            value={countSuccess.toLocaleString('vi-VN')}
+            icon={<CheckCircleRoundedIcon sx={{ fontSize: 20 }} />}
+            iconBg="rgba(52, 152, 219, 0.18)"
+            iconFg="#1b5fb8"
+          />
         </Grid>
         <Grid item xs={12} md={3}>
-          {metricCard("Đang chờ xử lý", "23", "rgb(245,158,11)", "⏱")}
+          <StatCard
+            title="Đang chờ xử lý"
+            value={countPending.toLocaleString('vi-VN')}
+            icon={<HourglassTopRoundedIcon sx={{ fontSize: 20 }} />}
+            iconBg="rgba(243, 156, 18, 0.18)"
+            iconFg="#8a5a00"
+          />
         </Grid>
         <Grid item xs={12} md={3}>
-          {metricCard("Giao dịch thất bại", "12", "rgb(239,68,68)", "✕")}
+          <StatCard
+            title="Giao dịch thất bại"
+            value={countFailed.toLocaleString('vi-VN')}
+            icon={<CancelRoundedIcon sx={{ fontSize: 20 }} />}
+            iconBg="rgba(231, 76, 60, 0.16)"
+            iconFg="#a11b10"
+          />
         </Grid>
       </Grid>
 
       {/* Table */}
-      <Paper variant="outlined" sx={{ borderRadius: 2, p: 2 }}>
-        <Box
-          sx={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            mb: 1.5,
-          }}
-        >
-          <Typography variant="h6" sx={{ fontWeight: 800 }}>
-            Lịch sử giao dịch
-          </Typography>
+      <Card sx={{ borderRadius: 3 }}>
+        <CardContent sx={{ p: 2.5 }}>
+          <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
+            <Typography variant="h6" sx={{ fontWeight: 900 }}>
+              Lịch sử giao dịch
+            </Typography>
 
-          <FormControl size="small" sx={{ minWidth: 180 }}>
-            <Select
-              value={filter}
-              onChange={(e) => setFilter(e.target.value as StatusFilter)}
-              sx={{ borderRadius: 2 }}
-            >
-              <MenuItem value="all">Tất cả trạng thái</MenuItem>
-              <MenuItem value="success">Thành công</MenuItem>
-              <MenuItem value="pending">Đang chờ</MenuItem>
-              <MenuItem value="failed">Thất bại</MenuItem>
-            </Select>
-          </FormControl>
-        </Box>
+            <FormControl size="small" sx={{ minWidth: 180 }}>
+              <Select value={statusFilter} onChange={handleChangeFilter} displayEmpty>
+                <MenuItem value="all">Tất cả trạng thái</MenuItem>
+                <MenuItem value="success">Thành công</MenuItem>
+                <MenuItem value="pending">Đang chờ</MenuItem>
+                <MenuItem value="failed">Thất bại</MenuItem>
+              </Select>
+            </FormControl>
+          </Stack>
 
-        <TableContainer>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell sx={{ fontWeight: 800, color: "text.secondary" }}>Người dùng</TableCell>
-                <TableCell sx={{ fontWeight: 800, color: "text.secondary" }}>Gói dịch vụ</TableCell>
-                <TableCell sx={{ fontWeight: 800, color: "text.secondary" }}>Số tiền</TableCell>
-                <TableCell sx={{ fontWeight: 800, color: "text.secondary" }}>Phương thức</TableCell>
-                <TableCell sx={{ fontWeight: 800, color: "text.secondary" }}>Trạng thái</TableCell>
-                <TableCell sx={{ fontWeight: 800, color: "text.secondary" }}>Ngày GD</TableCell>
-                <TableCell sx={{ fontWeight: 800, color: "text.secondary" }}>Thao tác</TableCell>
-              </TableRow>
-            </TableHead>
+          <Box
+            sx={{
+              border: '1px solid rgba(0,0,0,0.08)',
+              borderRadius: 2,
+              overflow: 'hidden',
+            }}
+          >
+            <Box component="table" sx={{ width: '100%', borderCollapse: 'collapse' }}>
+              <Box component="thead" sx={{ bgcolor: 'rgba(0,0,0,0.02)' }}>
+                <Box component="tr" sx={{ '& th': { py: 1.5, px: 2, textAlign: 'left', fontSize: 12, color: 'text.secondary' } }}>
+                  <Box component="th">Người dùng</Box>
+                  <Box component="th">Gói dịch vụ</Box>
+                  <Box component="th">Số tiền</Box>
+                  <Box component="th">Phương thức</Box>
+                  <Box component="th">Trạng thái</Box>
+                  <Box component="th">Ngày GD</Box>
+                  <Box component="th" sx={{ textAlign: 'center' }}>
+                    Thao tác
+                  </Box>
+                </Box>
+              </Box>
 
-            <TableBody>
-              {paged.map((p) => (
-                <TableRow key={p.id} hover>
-                  <TableCell>
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-                      <Box
-                        sx={{
-                          width: 38,
-                          height: 38,
-                          borderRadius: "999px",
-                          bgcolor: "rgb(16,185,129)",
-                          color: "#fff",
-                          display: "grid",
-                          placeItems: "center",
-                          fontWeight: 900,
-                        }}
-                      >
-                        {initials(p.userName)}
-                      </Box>
-                      <Typography sx={{ fontWeight: 700 }}>{p.userName}</Typography>
-                    </Box>
-                  </TableCell>
+              <Box component="tbody">
+                {paged.map((row) => {
+                  const status = STATUS_META[row.status];
+                  const method = METHOD_META[row.method];
 
-                  <TableCell>
-                    <Typography sx={{ fontWeight: 700, color: "text.secondary" }}>
-                      {p.packageName}
-                    </Typography>
-                  </TableCell>
-
-                  <TableCell>
-                    <Typography sx={{ fontWeight: 800 }}>{formatVND(p.amount)}</Typography>
-                  </TableCell>
-
-                  <TableCell>
-                    <Chip size="small" label={methodChip(p.method).label} sx={methodChip(p.method).sx} />
-                  </TableCell>
-
-                  <TableCell>
-                    <Chip size="small" label={statusChip(p.status).label} sx={statusChip(p.status).sx} />
-                  </TableCell>
-
-                  <TableCell>
-                    <Typography sx={{ color: "text.secondary", fontWeight: 700 }}>{p.date}</Typography>
-                  </TableCell>
-
-                  <TableCell>
-                    <IconButton
-                      onClick={() => handleOpenReceipt(p)}
+                  return (
+                    <Box
+                      component="tr"
+                      key={row.id}
                       sx={{
-                        width: 34,
-                        height: 34,
-                        borderRadius: 2,
-                        color: "rgb(37,99,235)",
+                        borderTop: '1px solid rgba(0,0,0,0.06)',
+                        '& td': { py: 1.4, px: 2, verticalAlign: 'middle' },
                       }}
                     >
-                      {/* icon “mắt” không cần thư viện */}
-                      <Box component="span" sx={{ fontSize: 18, lineHeight: 1 }}>
-                        👁
+                      <Box component="td">
+                        <Stack direction="row" spacing={1.5} alignItems="center">
+                          <Avatar sx={{ width: 36, height: 36, fontWeight: 800 }}>
+                            {initialsFromName(row.userName)}
+                          </Avatar>
+                          <Typography sx={{ fontWeight: 800 }}>{row.userName}</Typography>
+                        </Stack>
                       </Box>
-                    </IconButton>
-                  </TableCell>
-                </TableRow>
-              ))}
 
-              {paged.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={7} sx={{ py: 4 }}>
-                    <Typography color="text.secondary" align="center">
-                      Không có giao dịch phù hợp bộ lọc.
-                    </Typography>
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
+                      <Box component="td">
+                        <Typography sx={{ fontWeight: 700, color: 'text.primary' }}>{row.plan}</Typography>
+                      </Box>
 
-        {/* Footer */}
-        <Box
-          sx={{
-            mt: 2,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-          }}
-        >
-          <Typography variant="body2" color="text.secondary">
-            Hiển thị {(safePage - 1) * pageSize + 1}-{Math.min(safePage * pageSize, filtered.length)} trong tổng số{" "}
-            {filtered.length} giao dịch
-          </Typography>
+                      <Box component="td">
+                        <Typography sx={{ fontWeight: 900 }}>{formatVnd(row.amountVnd)}</Typography>
+                      </Box>
 
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-            <Button
-              variant="outlined"
-              size="small"
-              onClick={() => setPage((v) => Math.max(1, v - 1))}
-              disabled={safePage <= 1}
-              sx={{ borderRadius: 2, textTransform: "none" }}
-            >
-              Trước
-            </Button>
+                      <Box component="td">
+                        {/* ✅ Không truyền onClick -> tránh lỗi onClick is not a function */}
+                        <Chip label={method.label} size="small" sx={{ ...method.sx, borderRadius: 999 }} />
+                      </Box>
 
-            <Box
-              sx={{
-                width: 32,
-                height: 32,
-                borderRadius: 2,
-                bgcolor: "rgb(16,185,129)",
-                color: "#fff",
-                display: "grid",
-                placeItems: "center",
-                fontWeight: 900,
-              }}
-            >
-              {safePage}
-            </Box>
+                      <Box component="td">
+                        <Chip label={status.label} size="small" sx={{ ...status.chipSx, borderRadius: 999 }} />
+                      </Box>
 
-            <Button
-              variant="outlined"
-              size="small"
-              onClick={() => setPage((v) => Math.min(totalPages, v + 1))}
-              disabled={safePage >= totalPages}
-              sx={{ borderRadius: 2, textTransform: "none" }}
-            >
-              Sau
-            </Button>
-          </Box>
-        </Box>
-      </Paper>
+                      <Box component="td">
+                        <Typography sx={{ fontWeight: 700 }}>{row.date}</Typography>
+                      </Box>
 
-      {/* Receipt Modal */}
-      <Dialog open={open} onClose={handleCloseReceipt} maxWidth="sm" fullWidth>
-        <DialogTitle sx={{ pb: 1 }}>
-          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <Typography sx={{ fontWeight: 900 }}>Chi tiết biên lai giao dịch</Typography>
-            <IconButton onClick={handleCloseReceipt}>
-              <Box component="span" sx={{ fontSize: 22, lineHeight: 1 }}>
-                ×
+                      <Box component="td" sx={{ textAlign: 'center' }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <IconButton
+                            size="small"
+                            onClick={() => openView(row)}
+                            sx={{
+                              width: 32,
+                              height: 32,
+                              '& svg': { display: 'block', fontSize: 18 },
+                            }}
+                          >
+                            <VisibilityRoundedIcon />
+                          </IconButton>
+                        </Box>
+                      </Box>
+                    </Box>
+                  );
+                })}
               </Box>
-            </IconButton>
+            </Box>
           </Box>
+
+          {/* Footer / Pagination */}
+          <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mt: 2 }}>
+            <Typography variant="body2" color="text.secondary">
+              Hiển thị {(safePage - 1) * rowsPerPage + 1}-{Math.min(safePage * rowsPerPage, filtered.length)} trong tổng số{' '}
+              {filtered.length} giao dịch
+            </Typography>
+
+            <Stack direction="row" spacing={1} alignItems="center">
+              <Button
+                variant="outlined"
+                size="small"
+                disabled={safePage <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                sx={{ borderRadius: 999, minWidth: 70 }}
+              >
+                Trước
+              </Button>
+              <Box
+                sx={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: 999,
+                  bgcolor: 'rgba(46, 204, 113, 0.18)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontWeight: 900,
+                }}
+              >
+                {safePage}
+              </Box>
+              <Button
+                variant="outlined"
+                size="small"
+                disabled={safePage >= totalPages}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                sx={{ borderRadius: 999, minWidth: 70 }}
+              >
+                Sau
+              </Button>
+            </Stack>
+          </Stack>
+        </CardContent>
+      </Card>
+
+      {/* Detail Dialog */}
+      <Dialog open={openDetail} onClose={closeView} maxWidth="sm" fullWidth scroll="paper">
+        <DialogTitle sx={{ fontWeight: 900 }}>
+          Chi tiết biên lai giao dịch
+          <IconButton onClick={closeView} sx={{ position: 'absolute', right: 10, top: 10 }}>
+            <CloseRoundedIcon />
+          </IconButton>
         </DialogTitle>
 
-        <DialogContent dividers sx={{ p: 3 }}>
-          {selected && (
+        <DialogContent dividers sx={{ pt: 2 }}>
+          {selected ? (
             <Box>
-              <Box sx={{ display: "flex", justifyContent: "center", mb: 2 }}>
+              {/* Status pill center */}
+              <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
                 <Chip
+                  icon={STATUS_META[selected.status].icon}
                   label={
-                    selected.status === "success"
-                      ? "✓ Thanh toán thành công"
-                      : selected.status === "pending"
-                        ? "⏱ Đang chờ xử lý"
-                        : "✕ Thanh toán thất bại"
+                    selected.status === 'success'
+                      ? 'Thanh toán thành công'
+                      : selected.status === 'pending'
+                        ? 'Đang chờ xử lý'
+                        : 'Thanh toán thất bại'
                   }
                   sx={{
-                    ...(statusChip(selected.status).sx as any),
-                    bgcolor:
-                      selected.status === "success"
-                        ? "rgba(16,185,129,.15)"
-                        : selected.status === "pending"
-                          ? "rgba(245,158,11,.15)"
-                          : "rgba(239,68,68,.15)",
+                    borderRadius: 999,
                     px: 1,
+                    fontWeight: 900,
+                    ...(selected.status === 'success'
+                      ? {
+                        bgcolor: 'rgba(46, 204, 113, 0.15)',
+                        color: '#0f7a3c',
+                        border: '1px solid rgba(46, 204, 113, 0.25)',
+                      }
+                      : selected.status === 'pending'
+                        ? {
+                          bgcolor: 'rgba(243, 156, 18, 0.15)',
+                          color: '#8a5a00',
+                          border: '1px solid rgba(243, 156, 18, 0.25)',
+                        }
+                        : {
+                          bgcolor: 'rgba(231, 76, 60, 0.12)',
+                          color: '#a11b10',
+                          border: '1px solid rgba(231, 76, 60, 0.22)',
+                        }),
+                    '& svg': { display: 'block' },
                   }}
                 />
               </Box>
 
-              <Paper variant="outlined" sx={{ borderRadius: 2, p: 2.5, mb: 2 }}>
-                <Typography sx={{ fontWeight: 900, mb: 2 }}>Thông tin giao dịch</Typography>
+              {/* Transaction info */}
+              <Box
+                sx={{
+                  border: '1px solid rgba(0,0,0,0.08)',
+                  borderRadius: 2,
+                  p: 2,
+                  mb: 2,
+                }}
+              >
+                <Typography sx={{ fontWeight: 900, mb: 1 }}>Thông tin giao dịch</Typography>
 
                 <Grid container spacing={2}>
-                  <Grid item xs={12} sm={6}>
-                    <Typography variant="body2" color="text.secondary">
+                  <Grid item xs={6}>
+                    <Typography variant="caption" color="text.secondary">
                       Mã giao dịch
                     </Typography>
-                    <Typography sx={{ fontWeight: 900 }}>{selected.transactionCode}</Typography>
+                    <Typography sx={{ fontWeight: 800 }}>{selected.id}</Typography>
                   </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <Typography variant="body2" color="text.secondary">
+                  <Grid item xs={6}>
+                    <Typography variant="caption" color="text.secondary">
                       Ngày giao dịch
                     </Typography>
-                    <Typography sx={{ fontWeight: 900 }}>{selected.date}</Typography>
+                    <Typography sx={{ fontWeight: 800 }}>{selected.date}</Typography>
+                  </Grid>
+
+                  <Grid item xs={12}>
+                    <Divider sx={{ my: 0.5 }} />
+                  </Grid>
+
+                  <Grid item xs={6}>
+                    <Typography variant="caption" color="text.secondary">
+                      Gói dịch vụ
+                    </Typography>
+                    <Typography sx={{ fontWeight: 800 }}>{selected.plan}</Typography>
+                  </Grid>
+
+                  <Grid item xs={6}>
+                    <Typography variant="caption" color="text.secondary">
+                      Phương thức thanh toán
+                    </Typography>
+                    <Typography sx={{ fontWeight: 800 }}>{METHOD_META[selected.method].label}</Typography>
+                  </Grid>
+
+                  <Grid item xs={12}>
+                    <Divider sx={{ my: 0.5 }} />
+                  </Grid>
+
+                  <Grid item xs={6}>
+                    <Typography variant="caption" color="text.secondary">
+                      Số tiền
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={6} sx={{ textAlign: 'right' }}>
+                    <Typography sx={{ fontWeight: 900, color: '#0f7a3c', fontSize: 20 }}>
+                      {formatVnd(selected.amountVnd)}
+                    </Typography>
                   </Grid>
                 </Grid>
+              </Box>
 
-                <Divider sx={{ my: 2 }} />
+              {/* Customer info */}
+              <Box sx={{ border: '1px solid rgba(0,0,0,0.08)', borderRadius: 2, p: 2 }}>
+                <Typography sx={{ fontWeight: 900, mb: 1 }}>Thông tin khách hàng</Typography>
 
-                <Box sx={{ mb: 2 }}>
-                  <Typography variant="body2" color="text.secondary">
-                    Gói dịch vụ
-                  </Typography>
-                  <Typography sx={{ fontWeight: 900 }}>{selected.packageName}</Typography>
-                </Box>
+                <Grid container spacing={2}>
+                  <Grid item xs={12}>
+                    <Typography variant="caption" color="text.secondary">
+                      Họ và tên
+                    </Typography>
+                    <Typography sx={{ fontWeight: 800 }}>{selected.userName}</Typography>
+                  </Grid>
 
-                <Box sx={{ mb: 2 }}>
-                  <Typography variant="body2" color="text.secondary">
-                    Phương thức thanh toán
-                  </Typography>
-                  <Typography sx={{ fontWeight: 900 }}>{selected.method}</Typography>
-                </Box>
+                  <Grid item xs={12}>
+                    <Divider sx={{ my: 0.5 }} />
+                  </Grid>
 
-                <Divider sx={{ my: 2 }} />
+                  <Grid item xs={12}>
+                    <Typography variant="caption" color="text.secondary">
+                      Email
+                    </Typography>
+                    <Typography sx={{ fontWeight: 800 }}>{selected.email}</Typography>
+                  </Grid>
 
-                <Box sx={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between" }}>
-                  <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 700 }}>
-                    Số tiền
-                  </Typography>
-                  <Typography sx={{ fontWeight: 1000, fontSize: 22, color: "rgb(16,185,129)" }}>
-                    {formatVND(selected.amount)}
-                  </Typography>
-                </Box>
-              </Paper>
+                  <Grid item xs={12}>
+                    <Divider sx={{ my: 0.5 }} />
+                  </Grid>
 
-              <Paper variant="outlined" sx={{ borderRadius: 2, p: 2.5 }}>
-                <Typography sx={{ fontWeight: 900, mb: 2 }}>Thông tin khách hàng</Typography>
-
-                <Box sx={{ mb: 2 }}>
-                  <Typography variant="body2" color="text.secondary">
-                    Họ và tên
-                  </Typography>
-                  <Typography sx={{ fontWeight: 900 }}>{selected.userName}</Typography>
-                </Box>
-
-                <Divider sx={{ my: 1.5 }} />
-
-                <Box sx={{ mb: 2 }}>
-                  <Typography variant="body2" color="text.secondary">
-                    Email
-                  </Typography>
-                  <Typography sx={{ fontWeight: 900 }}>{selected.email}</Typography>
-                </Box>
-
-                <Divider sx={{ my: 1.5 }} />
-
-                <Box>
-                  <Typography variant="body2" color="text.secondary">
-                    Số điện thoại
-                  </Typography>
-                  <Typography sx={{ fontWeight: 900 }}>{selected.phone}</Typography>
-                </Box>
-              </Paper>
+                  <Grid item xs={12}>
+                    <Typography variant="caption" color="text.secondary">
+                      Số điện thoại
+                    </Typography>
+                    <Typography sx={{ fontWeight: 800 }}>{selected.phone}</Typography>
+                  </Grid>
+                </Grid>
+              </Box>
             </Box>
-          )}
+          ) : null}
         </DialogContent>
       </Dialog>
     </Box>
