@@ -2,495 +2,463 @@
 
 import React, { useMemo, useState } from "react";
 import {
+  Alert,
   Box,
   Button,
-  Chip,
   Divider,
   FormControl,
   Grid,
   MenuItem,
   Paper,
   Select,
-  SelectChangeEvent,
   Stack,
   Table,
   TableBody,
   TableCell,
-  TableContainer,
   TableHead,
   TableRow,
   Typography,
 } from "@mui/material";
 
-type TimeRange = "24h" | "7d" | "30d";
+import SmartToyRoundedIcon from "@mui/icons-material/SmartToyRounded";
+import ScheduleRoundedIcon from "@mui/icons-material/ScheduleRounded";
+import VerifiedRoundedIcon from "@mui/icons-material/VerifiedRounded";
+import PaidRoundedIcon from "@mui/icons-material/PaidRounded";
+import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 
-type AlertType = "error" | "warning" | "info";
+import ErrorOutlineRoundedIcon from "@mui/icons-material/ErrorOutlineRounded";
+import WarningAmberRoundedIcon from "@mui/icons-material/WarningAmberRounded";
+import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 
-type ModelPerf = {
-  id: string;
-  name: string;
-  requests: number;
-  avgTimeSec: number;
-  accuracyPct: number;
-  costUsd: number;
-  status: "Hoạt động" | "Tạm dừng";
-};
+type ModelKey = "gpt4" | "gpt35" | "claude3";
+type ActivityType = "Phỏng vấn" | "CV" | "Hỏi đáp" | "Luyện tập";
+type ActivityStatus = "Thành công" | "Cảnh báo" | "Thất bại";
 
-type ActivityRow = {
-  id: string;
-  type: "Phỏng vấn" | "Chấm điểm" | "Gợi ý" | "Tổng hợp";
-  user: string;
-  prompt: string;
-  status: "Thành công" | "Đang chờ" | "Thất bại";
-  latencySec: number;
-  accuracyPct: number;
-  timeAgo: string;
-};
-
-function pctChip(deltaPct: number) {
-  const positive = deltaPct >= 0;
-  const label = `${positive ? "+" : ""}${deltaPct.toFixed(1)}%`;
-  return (
-    <Chip
-      label={label}
-      size="small"
-      sx={{
-        height: 24,
-        fontWeight: 600,
-        bgcolor: positive ? "rgba(46, 204, 113, 0.18)" : "rgba(231, 76, 60, 0.18)",
-        color: positive ? "#1f7a3a" : "#9b2c2c",
-        border: "1px solid",
-        borderColor: positive ? "rgba(46, 204, 113, 0.25)" : "rgba(231, 76, 60, 0.25)",
-      }}
-    />
-  );
-}
-
-function iconBox(bg: string, text: string) {
+function Pill(props: { text: string; bg: string; fg: string }) {
   return (
     <Box
       sx={{
-        width: 44,
-        height: 44,
-        borderRadius: 2,
-        bgcolor: bg,
-        color: "#fff",
-        display: "grid",
-        placeItems: "center",
-        fontWeight: 800,
-        userSelect: "none",
+        display: "inline-flex",
+        alignItems: "center",
+        px: 1.2,
+        py: 0.35,
+        borderRadius: 999,
+        bgcolor: props.bg,
+        color: props.fg,
+        fontWeight: 900,
+        fontSize: 12,
+        whiteSpace: "nowrap",
       }}
     >
-      {text}
+      {props.text}
     </Box>
   );
 }
 
-function statusChip(label: string) {
-  const map: Record<string, { bg: string; color: string; bd: string }> = {
-    "Thành công": { bg: "rgba(46, 204, 113, 0.18)", color: "#1f7a3a", bd: "rgba(46, 204, 113, 0.25)" },
-    "Đang chờ": { bg: "rgba(241, 196, 15, 0.18)", color: "#8a6d00", bd: "rgba(241, 196, 15, 0.25)" },
-    "Thất bại": { bg: "rgba(231, 76, 60, 0.18)", color: "#9b2c2c", bd: "rgba(231, 76, 60, 0.25)" },
-  };
-  const s = map[label] ?? { bg: "rgba(52, 152, 219, 0.12)", color: "#1f4f7a", bd: "rgba(52, 152, 219, 0.20)" };
-
+function StatCard(props: {
+  iconBg: string;
+  iconColor: string;
+  icon: React.ReactNode;
+  title: string;
+  value: string;
+  deltaText: string;
+  deltaBg: string;
+  deltaColor: string;
+}) {
   return (
-    <Chip
-      label={label}
-      size="small"
-      sx={{
-        height: 24,
-        fontWeight: 600,
-        bgcolor: s.bg,
-        color: s.color,
-        border: "1px solid",
-        borderColor: s.bd,
-      }}
-    />
-  );
-}
-
-function typeChip(label: ActivityRow["type"]) {
-  const map: Record<ActivityRow["type"], { bg: string; color: string; bd: string }> = {
-    "Phỏng vấn": { bg: "rgba(155, 89, 182, 0.18)", color: "#6b2d86", bd: "rgba(155, 89, 182, 0.25)" },
-    "Chấm điểm": { bg: "rgba(52, 152, 219, 0.18)", color: "#1f4f7a", bd: "rgba(52, 152, 219, 0.25)" },
-    "Gợi ý": { bg: "rgba(46, 204, 113, 0.18)", color: "#1f7a3a", bd: "rgba(46, 204, 113, 0.25)" },
-    "Tổng hợp": { bg: "rgba(241, 196, 15, 0.18)", color: "#8a6d00", bd: "rgba(241, 196, 15, 0.25)" },
-  };
-  const s = map[label];
-
-  // Không gắn onClick vào Chip để tránh lỗi "onClick is not a function"
-  return (
-    <Chip
-      label={label}
-      size="small"
-      sx={{
-        height: 24,
-        fontWeight: 700,
-        bgcolor: s.bg,
-        color: s.color,
-        border: "1px solid",
-        borderColor: s.bd,
-      }}
-    />
-  );
-}
-
-function alertBox(type: AlertType, title: string, desc: string, time: string) {
-  const theme = {
-    error: {
-      bg: "rgba(231, 76, 60, 0.10)",
-      bd: "rgba(231, 76, 60, 0.25)",
-      iconBg: "rgba(231, 76, 60, 0.18)",
-      icon: "!",
-      title: "#b42318",
-      text: "#7a271a",
-    },
-    warning: {
-      bg: "rgba(241, 196, 15, 0.10)",
-      bd: "rgba(241, 196, 15, 0.25)",
-      iconBg: "rgba(241, 196, 15, 0.18)",
-      icon: "△",
-      title: "#b54708",
-      text: "#7a2e0e",
-    },
-    info: {
-      bg: "rgba(52, 152, 219, 0.10)",
-      bd: "rgba(52, 152, 219, 0.25)",
-      iconBg: "rgba(52, 152, 219, 0.18)",
-      icon: "i",
-      title: "#175cd3",
-      text: "#1849a9",
-    },
-  }[type];
-
-  return (
-    <Box
+    <Paper
       sx={{
         p: 2,
-        borderRadius: 2,
-        border: "1px solid",
-        borderColor: theme.bd,
-        bgcolor: theme.bg,
+        borderRadius: 3,
+        border: "1px solid rgba(0,0,0,0.06)",
+        height: "100%",
       }}
     >
-      <Stack direction="row" spacing={1.5} alignItems="flex-start">
+      <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ gap: 2 }}>
         <Box
           sx={{
-            width: 32,
-            height: 32,
-            borderRadius: 1.5,
-            bgcolor: theme.iconBg,
+            width: 44,
+            height: 44,
+            borderRadius: 2.5,
+            bgcolor: props.iconBg,
             display: "grid",
             placeItems: "center",
-            color: theme.title,
-            fontWeight: 900,
-            flex: "0 0 auto",
-            mt: 0.2,
+            flexShrink: 0,
           }}
         >
-          {theme.icon}
+          <Box sx={{ color: props.iconColor }}>{props.icon}</Box>
         </Box>
-        <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Typography sx={{ fontWeight: 800, color: theme.title }}>{title}</Typography>
-          <Typography sx={{ mt: 0.5, color: theme.text, fontSize: 13 }}>{desc}</Typography>
-          <Typography sx={{ mt: 0.8, color: theme.text, fontSize: 12, opacity: 0.85 }}>{time}</Typography>
-        </Box>
+
+        <Pill text={props.deltaText} bg={props.deltaBg} fg={props.deltaColor} />
       </Stack>
-    </Box>
+
+      <Typography sx={{ mt: 1.2, color: "text.secondary", fontWeight: 900, fontSize: 13 }}>
+        {props.title}
+      </Typography>
+
+      <Typography sx={{ mt: 0.6, fontWeight: 900, fontSize: 26, letterSpacing: -0.2 }}>
+        {props.value}
+      </Typography>
+    </Paper>
   );
 }
 
 export default function AIMonitoringPage() {
-  const [range, setRange] = useState<TimeRange>("24h");
+  const [range, setRange] = useState<"24h" | "7d" | "30d">("24h");
 
+  // ===== Mock data giống layout bạn gửi =====
   const stats = useMemo(
     () => ({
-      totalRequests: { value: 12456, delta: 12.5 },
-      avgTime: { value: 1.2, delta: -8.3 },
-      accuracy: { value: 94.8, delta: 2.1 },
-      cost: { value: 234.5, delta: 15.2 },
+      totalRequests: "12,456",
+      avgLatency: "1.2s",
+      accuracy: "94.8%",
+      apiCost: "$234.50",
     }),
     []
   );
 
-  const models: ModelPerf[] = useMemo(
+  const models = useMemo(
     () => [
-      { id: "m1", name: "GPT-4", requests: 8234, avgTimeSec: 1.1, accuracyPct: 96.2, costUsd: 156.4, status: "Hoạt động" },
-      { id: "m2", name: "GPT-3.5 Turbo", requests: 3456, avgTimeSec: 0.8, accuracyPct: 92.8, costUsd: 45.2, status: "Hoạt động" },
-      { id: "m3", name: "Claude 3", requests: 766, avgTimeSec: 1.3, accuracyPct: 94.5, costUsd: 32.9, status: "Hoạt động" },
+      { key: "gpt4" as ModelKey, name: "GPT-4", req: "8,234 yêu cầu", latency: "1.1s", acc: "96.2%", cost: "$156.40" },
+      { key: "gpt35" as ModelKey, name: "GPT-3.5 Turbo", req: "3,456 yêu cầu", latency: "0.8s", acc: "92.8%", cost: "$45.20" },
+      { key: "claude3" as ModelKey, name: "Claude 3", req: "766 yêu cầu", latency: "1.3s", acc: "94.5%", cost: "$32.90" },
     ],
     []
   );
 
   const alerts = useMemo(
     () => [
-      { type: "error" as const, title: "Lỗi API Timeout", desc: "Model GPT-4 phản hồi chậm hơn 3s", time: "5 phút trước" },
-      { type: "warning" as const, title: "Cảnh báo chi phí", desc: "Chi phí API vượt ngưỡng 80%", time: "15 phút trước" },
-      { type: "info" as const, title: "Thông báo", desc: "Độ chính xác tăng 2.1% so với tuần trước", time: "1 giờ trước" },
+      {
+        type: "error" as const,
+        title: "Lỗi API Timeout",
+        desc: "Model GPT-4 phản hồi chậm hơn 3s",
+        time: "5 phút trước",
+      },
+      {
+        type: "warning" as const,
+        title: "Cảnh báo chi phí",
+        desc: "Chi phí API vượt ngưỡng 80%",
+        time: "15 phút trước",
+      },
+      {
+        type: "info" as const,
+        title: "Thông báo",
+        desc: "Độ chính xác tăng 2.1% so với tuần trước",
+        time: "1 giờ trước",
+      },
     ],
     []
   );
 
-  const activity: ActivityRow[] = useMemo(
+  const activities = useMemo(
     () => [
-      { id: "a1", type: "Phỏng vấn", user: "Nguyễn Văn A", prompt: "Giải thích về React Hooks", status: "Thành công", latencySec: 1.1, accuracyPct: 96, timeAgo: "2 phút trước" },
-      { id: "a2", type: "Chấm điểm", user: "Trần Thị B", prompt: "Đánh giá câu trả lời về SQL JOIN", status: "Thành công", latencySec: 0.9, accuracyPct: 92, timeAgo: "10 phút trước" },
-      { id: "a3", type: "Gợi ý", user: "Lê Văn C", prompt: "Gợi ý câu hỏi phỏng vấn Backend", status: "Đang chờ", latencySec: 1.6, accuracyPct: 0, timeAgo: "25 phút trước" },
-      { id: "a4", type: "Tổng hợp", user: "Phạm Thị D", prompt: "Tóm tắt feedback ứng viên", status: "Thất bại", latencySec: 2.4, accuracyPct: 0, timeAgo: "1 giờ trước" },
+      { id: "a1", type: "Phỏng vấn" as ActivityType, user: "Nguyễn Văn A", question: "Giải thích về React Hooks", status: "Thành công" as ActivityStatus, latency: "1.1s", acc: "96%", time: "2 phút trước" },
+      { id: "a2", type: "Hỏi đáp" as ActivityType, user: "Trần Thị B", question: "Tối ưu hóa CV cho Data Analyst", status: "Cảnh báo" as ActivityStatus, latency: "2.4s", acc: "90%", time: "12 phút trước" },
+      { id: "a3", type: "CV" as ActivityType, user: "Lê Văn C", question: "Chấm điểm CV vị trí Backend", status: "Thành công" as ActivityStatus, latency: "0.9s", acc: "95%", time: "32 phút trước" },
+      { id: "a4", type: "Luyện tập" as ActivityType, user: "Phạm Thị D", question: "Mock interview tiếng Anh", status: "Thất bại" as ActivityStatus, latency: "—", acc: "—", time: "1 giờ trước" },
     ],
     []
   );
 
-  const handleRangeChange = (e: SelectChangeEvent) => {
-    setRange(e.target.value as TimeRange);
+  const statusPill = (s: ActivityStatus) => {
+    if (s === "Thành công") return { bg: "rgba(16,185,129,0.14)", fg: "#047857" };
+    if (s === "Cảnh báo") return { bg: "rgba(245,158,11,0.18)", fg: "#b45309" };
+    return { bg: "rgba(239,68,68,0.16)", fg: "#b91c1c" };
   };
 
-  const handleRefresh = () => {
+  const typePill = (t: ActivityType) => {
+    if (t === "Phỏng vấn") return { bg: "rgba(168,85,247,0.14)", fg: "#7c3aed" };
+    if (t === "CV") return { bg: "rgba(59,130,246,0.12)", fg: "#2563eb" };
+    if (t === "Hỏi đáp") return { bg: "rgba(16,185,129,0.14)", fg: "#047857" };
+    return { bg: "rgba(99,102,241,0.14)", fg: "#4f46e5" };
+  };
+
+  const onRefresh = () => {
+    // demo refresh
+    // nếu nối API thật thì gọi fetch ở đây
     console.log("refresh", range);
   };
 
   return (
-    // ✅ FULL WIDTH: ép page không bị bó maxWidth
     <Box
       sx={{
         width: "100%",
-        maxWidth: "none",
-        mx: 0,
-        px: { xs: 2, md: 3 },
+        maxWidth: "none",          // ✅ quan trọng: không bó chiều ngang
+        px: { xs: 2, md: 3 },      // padding đẹp và đều
         py: 3,
-        // ✅ nhìn “đầy màn hình” hơn, không bị trắng quá nhiều
-        minHeight: "calc(100vh - 120px)",
       }}
     >
-      {/* Header */}
-      <Stack direction={{ xs: "column", md: "row" }} spacing={2} alignItems={{ xs: "flex-start", md: "center" }} justifyContent="space-between">
+      {/* ===== Header ===== */}
+      <Stack
+        direction={{ xs: "column", md: "row" }}
+        justifyContent="space-between"
+        alignItems={{ xs: "stretch", md: "center" }}
+        sx={{ gap: 2, mb: 2 }}
+      >
         <Box>
-          <Typography sx={{ fontSize: 28, fontWeight: 900, letterSpacing: -0.3 }}>Giám sát AI</Typography>
-          <Typography sx={{ mt: 0.6, color: "text.secondary" }}>Theo dõi hiệu suất và hoạt động của AI</Typography>
+          <Typography sx={{ fontSize: 28, fontWeight: 900, letterSpacing: -0.3 }}>
+            Giám sát AI
+          </Typography>
+          <Typography sx={{ mt: 0.6, color: "text.secondary" }}>
+            Theo dõi hiệu suất và hoạt động của AI
+          </Typography>
         </Box>
 
-        <Stack direction="row" spacing={1.5} alignItems="center">
+        <Stack direction="row" spacing={1.2} justifyContent="flex-end" alignItems="center">
           <FormControl size="small">
-            <Select value={range} onChange={handleRangeChange} sx={{ minWidth: 160, borderRadius: 2 }}>
+            <Select
+              value={range}
+              onChange={(e) => setRange(e.target.value as any)}
+              sx={{ borderRadius: 3, minWidth: 140 }}
+            >
               <MenuItem value="24h">24 giờ qua</MenuItem>
               <MenuItem value="7d">7 ngày qua</MenuItem>
               <MenuItem value="30d">30 ngày qua</MenuItem>
             </Select>
           </FormControl>
 
-          <Button onClick={handleRefresh} variant="contained" sx={{ borderRadius: 2, fontWeight: 800, px: 2.2 }}>
+          <Button
+            variant="contained"
+            onClick={onRefresh}
+            startIcon={<RefreshRoundedIcon />}
+            sx={{
+              borderRadius: 3,
+              fontWeight: 900,
+              px: 2,
+              bgcolor: "#4f46e5",
+              "&:hover": { bgcolor: "#4338ca" },
+            }}
+          >
             Làm mới
           </Button>
         </Stack>
       </Stack>
 
-      {/* Stats */}
-      <Grid container spacing={2} sx={{ mt: 2 }}>
-        <Grid item xs={12} md={6} lg={3}>
-          <Paper sx={{ p: 2, borderRadius: 3, border: "1px solid rgba(0,0,0,0.06)", height: "100%" }}>
-            <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
-              {iconBox("#8e44ad", "AI")}
-              {pctChip(stats.totalRequests.delta)}
-            </Stack>
-            <Typography sx={{ mt: 1.6, color: "text.secondary", fontWeight: 700, fontSize: 13 }}>Tổng yêu cầu AI</Typography>
-            <Typography sx={{ mt: 0.4, fontSize: 28, fontWeight: 900 }}>{stats.totalRequests.value.toLocaleString("vi-VN")}</Typography>
-          </Paper>
+      {/* ===== Stats (full width, trải đều) ===== */}
+      <Grid container spacing={2} sx={{ mb: 2 }}>
+        <Grid item xs={12} sm={6} lg={3}>
+          <StatCard
+            iconBg="rgba(168,85,247,0.14)"
+            iconColor="#7c3aed"
+            icon={<SmartToyRoundedIcon />}
+            title="Tổng yêu cầu AI"
+            value={stats.totalRequests}
+            deltaText="+12.5%"
+            deltaBg="rgba(16,185,129,0.14)"
+            deltaColor="#047857"
+          />
         </Grid>
 
-        <Grid item xs={12} md={6} lg={3}>
-          <Paper sx={{ p: 2, borderRadius: 3, border: "1px solid rgba(0,0,0,0.06)", height: "100%" }}>
-            <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
-              {iconBox("#2e6bdc", "⏱")}
-              {pctChip(stats.avgTime.delta)}
-            </Stack>
-            <Typography sx={{ mt: 1.6, color: "text.secondary", fontWeight: 700, fontSize: 13 }}>Thời gian phản hồi TB</Typography>
-            <Typography sx={{ mt: 0.4, fontSize: 28, fontWeight: 900 }}>{stats.avgTime.value}s</Typography>
-          </Paper>
+        <Grid item xs={12} sm={6} lg={3}>
+          <StatCard
+            iconBg="rgba(59,130,246,0.12)"
+            iconColor="#2563eb"
+            icon={<ScheduleRoundedIcon />}
+            title="Thời gian phản hồi TB"
+            value={stats.avgLatency}
+            deltaText="-8.3%"
+            deltaBg="rgba(239,68,68,0.14)"
+            deltaColor="#b91c1c"
+          />
         </Grid>
 
-        <Grid item xs={12} md={6} lg={3}>
-          <Paper sx={{ p: 2, borderRadius: 3, border: "1px solid rgba(0,0,0,0.06)", height: "100%" }}>
-            <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
-              {iconBox("#0f9d58", "✓")}
-              {pctChip(stats.accuracy.delta)}
-            </Stack>
-            <Typography sx={{ mt: 1.6, color: "text.secondary", fontWeight: 700, fontSize: 13 }}>Độ chính xác</Typography>
-            <Typography sx={{ mt: 0.4, fontSize: 28, fontWeight: 900 }}>{stats.accuracy.value}%</Typography>
-          </Paper>
+        <Grid item xs={12} sm={6} lg={3}>
+          <StatCard
+            iconBg="rgba(16,185,129,0.14)"
+            iconColor="#047857"
+            icon={<VerifiedRoundedIcon />}
+            title="Độ chính xác"
+            value={stats.accuracy}
+            deltaText="+2.1%"
+            deltaBg="rgba(16,185,129,0.14)"
+            deltaColor="#047857"
+          />
         </Grid>
 
-        <Grid item xs={12} md={6} lg={3}>
-          <Paper sx={{ p: 2, borderRadius: 3, border: "1px solid rgba(0,0,0,0.06)", height: "100%" }}>
-            <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
-              {iconBox("#f2994a", "$")}
-              {pctChip(stats.cost.delta)}
-            </Stack>
-            <Typography sx={{ mt: 1.6, color: "text.secondary", fontWeight: 700, fontSize: 13 }}>Chi phí API</Typography>
-            <Typography sx={{ mt: 0.4, fontSize: 28, fontWeight: 900 }}>${stats.cost.value.toFixed(2)}</Typography>
-          </Paper>
+        <Grid item xs={12} sm={6} lg={3}>
+          <StatCard
+            iconBg="rgba(249,115,22,0.14)"
+            iconColor="#ea580c"
+            icon={<PaidRoundedIcon />}
+            title="Chi phí API"
+            value={stats.apiCost}
+            deltaText="+15.2%"
+            deltaBg="rgba(16,185,129,0.14)"
+            deltaColor="#047857"
+          />
         </Grid>
       </Grid>
 
-      {/* Middle blocks */}
-      <Grid container spacing={2} sx={{ mt: 2 }}>
-        <Grid item xs={12} lg={7}>
+      {/* ===== Middle blocks (2 cột đều) ===== */}
+      <Grid container spacing={2} sx={{ mb: 2 }}>
+        <Grid item xs={12} lg={6}>
           <Paper sx={{ p: 2, borderRadius: 3, border: "1px solid rgba(0,0,0,0.06)", height: "100%" }}>
             <Typography sx={{ fontWeight: 900, mb: 1.2 }}>Hiệu suất theo Model</Typography>
 
-            <Stack spacing={1.3}>
+            <Stack spacing={1.2}>
               {models.map((m) => (
                 <Paper
-                  key={m.id}
+                  key={m.key}
                   variant="outlined"
-                  sx={{
-                    p: 1.6,
-                    borderRadius: 3,
-                    borderColor: "rgba(0,0,0,0.08)",
-                  }}
+                  sx={{ p: 1.6, borderRadius: 3, borderColor: "rgba(0,0,0,0.08)" }}
                 >
-                  <Stack direction="row" alignItems="center" spacing={1.5}>
-                    <Box
-                      sx={{
-                        width: 44,
-                        height: 44,
-                        borderRadius: 2,
-                        bgcolor: "rgba(142, 68, 173, 0.12)",
-                        border: "1px solid rgba(142, 68, 173, 0.25)",
-                        display: "grid",
-                        placeItems: "center",
-                        color: "#6b2d86",
-                        fontWeight: 900,
-                        flex: "0 0 auto",
-                      }}
-                    >
-                      ⬡
-                    </Box>
+                  <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ gap: 2 }}>
+                    <Stack direction="row" spacing={1.2} alignItems="center">
+                      <Box
+                        sx={{
+                          width: 44,
+                          height: 44,
+                          borderRadius: 3,
+                          bgcolor: "rgba(168,85,247,0.12)",
+                          border: "1px solid rgba(168,85,247,0.18)",
+                          display: "grid",
+                          placeItems: "center",
+                        }}
+                      >
+                        <Box sx={{ width: 10, height: 10, borderRadius: 999, bgcolor: "#7c3aed" }} />
+                      </Box>
 
-                    <Box sx={{ flex: 1, minWidth: 0 }}>
-                      <Stack direction="row" justifyContent="space-between" alignItems="center">
-                        <Box>
-                          <Typography sx={{ fontWeight: 900 }}>{m.name}</Typography>
-                          <Typography sx={{ color: "text.secondary", fontSize: 12 }}>{m.requests.toLocaleString("vi-VN")} yêu cầu</Typography>
-                        </Box>
-                        <Chip
-                          label={m.status}
-                          size="small"
-                          sx={{
-                            height: 24,
-                            fontWeight: 800,
-                            bgcolor: "rgba(46, 204, 113, 0.18)",
-                            color: "#1f7a3a",
-                            border: "1px solid rgba(46, 204, 113, 0.25)",
-                          }}
-                        />
-                      </Stack>
+                      <Box>
+                        <Typography sx={{ fontWeight: 900, lineHeight: 1.2 }}>{m.name}</Typography>
+                        <Typography sx={{ color: "text.secondary", fontWeight: 800, fontSize: 12, mt: 0.3 }}>
+                          {m.req}
+                        </Typography>
+                      </Box>
+                    </Stack>
 
-                      <Grid container spacing={1.2} sx={{ mt: 0.8 }}>
-                        <Grid item xs={12} sm={4}>
-                          <Typography sx={{ color: "text.secondary", fontSize: 12, fontWeight: 700 }}>Thời gian TB</Typography>
-                          <Typography sx={{ fontWeight: 900 }}>{m.avgTimeSec.toFixed(1)}s</Typography>
-                        </Grid>
-                        <Grid item xs={12} sm={4}>
-                          <Typography sx={{ color: "text.secondary", fontSize: 12, fontWeight: 700 }}>Độ chính xác</Typography>
-                          <Typography sx={{ fontWeight: 900 }}>{m.accuracyPct.toFixed(1)}%</Typography>
-                        </Grid>
-                        <Grid item xs={12} sm={4}>
-                          <Typography sx={{ color: "text.secondary", fontSize: 12, fontWeight: 700 }}>Chi phí</Typography>
-                          <Typography sx={{ fontWeight: 900 }}>${m.costUsd.toFixed(2)}</Typography>
-                        </Grid>
-                      </Grid>
-                    </Box>
+                    <Pill text="Hoạt động" bg="rgba(16,185,129,0.14)" fg="#047857" />
                   </Stack>
+
+                  <Grid container spacing={1.2} sx={{ mt: 1 }}>
+                    <Grid item xs={4}>
+                      <Typography sx={{ color: "text.secondary", fontWeight: 900, fontSize: 12 }}>Thời gian TB</Typography>
+                      <Typography sx={{ fontWeight: 900 }}>{m.latency}</Typography>
+                    </Grid>
+                    <Grid item xs={4}>
+                      <Typography sx={{ color: "text.secondary", fontWeight: 900, fontSize: 12 }}>Độ chính xác</Typography>
+                      <Typography sx={{ fontWeight: 900 }}>{m.acc}</Typography>
+                    </Grid>
+                    <Grid item xs={4}>
+                      <Typography sx={{ color: "text.secondary", fontWeight: 900, fontSize: 12 }}>Chi phí</Typography>
+                      <Typography sx={{ fontWeight: 900 }}>{m.cost}</Typography>
+                    </Grid>
+                  </Grid>
                 </Paper>
               ))}
             </Stack>
           </Paper>
         </Grid>
 
-        <Grid item xs={12} lg={5}>
+        <Grid item xs={12} lg={6}>
           <Paper sx={{ p: 2, borderRadius: 3, border: "1px solid rgba(0,0,0,0.06)", height: "100%" }}>
             <Typography sx={{ fontWeight: 900, mb: 1.2 }}>Cảnh báo & Lỗi</Typography>
-            <Stack spacing={1.3}>
-              {alerts.map((a, idx) => (
-                <Box key={idx}>{alertBox(a.type, a.title, a.desc, a.time)}</Box>
-              ))}
+
+            <Stack spacing={1.2}>
+              {alerts.map((a, idx) => {
+                const boxStyle =
+                  a.type === "error"
+                    ? { bg: "rgba(239,68,68,0.10)", border: "rgba(239,68,68,0.25)" }
+                    : a.type === "warning"
+                      ? { bg: "rgba(245,158,11,0.12)", border: "rgba(245,158,11,0.25)" }
+                      : { bg: "rgba(59,130,246,0.10)", border: "rgba(59,130,246,0.22)" };
+
+                const icon =
+                  a.type === "error" ? (
+                    <ErrorOutlineRoundedIcon sx={{ color: "#b91c1c" }} />
+                  ) : a.type === "warning" ? (
+                    <WarningAmberRoundedIcon sx={{ color: "#b45309" }} />
+                  ) : (
+                    <InfoOutlinedIcon sx={{ color: "#2563eb" }} />
+                  );
+
+                const titleColor =
+                  a.type === "error" ? "#b91c1c" : a.type === "warning" ? "#b45309" : "#2563eb";
+
+                return (
+                  <Box
+                    key={idx}
+                    sx={{
+                      p: 1.6,
+                      borderRadius: 3,
+                      bgcolor: boxStyle.bg,
+                      border: `1px solid ${boxStyle.border}`,
+                    }}
+                  >
+                    <Stack direction="row" spacing={1.2} alignItems="flex-start">
+                      <Box sx={{ mt: 0.2 }}>{icon}</Box>
+                      <Box sx={{ flex: 1 }}>
+                        <Typography sx={{ fontWeight: 900, color: titleColor }}>{a.title}</Typography>
+                        <Typography sx={{ mt: 0.3, color: "text.secondary", fontWeight: 800, fontSize: 13 }}>
+                          {a.desc}
+                        </Typography>
+                        <Typography sx={{ mt: 0.6, color: "text.secondary", fontWeight: 800, fontSize: 12 }}>
+                          {a.time}
+                        </Typography>
+                      </Box>
+                    </Stack>
+                  </Box>
+                );
+              })}
             </Stack>
           </Paper>
         </Grid>
       </Grid>
 
-      {/* Recent activity */}
-      <Paper sx={{ mt: 2, p: 2, borderRadius: 3, border: "1px solid rgba(0,0,0,0.06)" }}>
-        <Typography sx={{ fontWeight: 900, mb: 1.2 }}>Hoạt động AI gần đây</Typography>
+      {/* ===== Recent activity (full width) ===== */}
+      <Paper sx={{ borderRadius: 3, border: "1px solid rgba(0,0,0,0.06)", overflow: "hidden" }}>
+        <Box sx={{ p: 2 }}>
+          <Typography sx={{ fontWeight: 900 }}>Hoạt động AI gần đây</Typography>
+        </Box>
 
-        <TableContainer sx={{ width: "100%" }}>
-          <Table size="small">
+        <Divider />
+
+        <Box sx={{ p: 2 }}>
+          <Table>
             <TableHead>
-              <TableRow sx={{ "& th": { fontWeight: 900, color: "text.secondary" } }}>
-                <TableCell>LOẠI</TableCell>
-                <TableCell>NGƯỜI DÙNG</TableCell>
-                <TableCell>CÂU HỎI</TableCell>
-                <TableCell>TRẠNG THÁI</TableCell>
-                <TableCell align="right">THỜI GIAN</TableCell>
-                <TableCell align="right">ĐỘ CHÍNH XÁC</TableCell>
-                <TableCell align="right">THỜI ĐIỂM</TableCell>
+              <TableRow>
+                <TableCell sx={{ fontWeight: 900, color: "text.secondary", fontSize: 12 }}>LOẠI</TableCell>
+                <TableCell sx={{ fontWeight: 900, color: "text.secondary", fontSize: 12 }}>NGƯỜI DÙNG</TableCell>
+                <TableCell sx={{ fontWeight: 900, color: "text.secondary", fontSize: 12 }}>CÂU HỎI</TableCell>
+                <TableCell sx={{ fontWeight: 900, color: "text.secondary", fontSize: 12 }}>TRẠNG THÁI</TableCell>
+                <TableCell sx={{ fontWeight: 900, color: "text.secondary", fontSize: 12 }}>THỜI GIAN</TableCell>
+                <TableCell sx={{ fontWeight: 900, color: "text.secondary", fontSize: 12 }}>ĐỘ CHÍNH XÁC</TableCell>
+                <TableCell sx={{ fontWeight: 900, color: "text.secondary", fontSize: 12 }}>THỜI ĐIỂM</TableCell>
               </TableRow>
             </TableHead>
 
             <TableBody>
-              {activity.map((r) => (
-                <TableRow key={r.id} hover sx={{ "& td": { borderColor: "rgba(0,0,0,0.06)" } }}>
-                  <TableCell>{typeChip(r.type)}</TableCell>
-                  <TableCell sx={{ fontWeight: 800 }}>{r.user}</TableCell>
-                  <TableCell sx={{ width: "100%" }}>
-                    <Typography sx={{ fontWeight: 700 }} noWrap title={r.prompt}>
-                      {r.prompt}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>{statusChip(r.status)}</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 800 }}>
-                    {r.latencySec.toFixed(1)}s
-                  </TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 800 }}>
-                    {r.accuracyPct > 0 ? `${r.accuracyPct}%` : "—"}
-                  </TableCell>
-                  <TableCell align="right" sx={{ color: "text.secondary", fontWeight: 700 }}>
-                    {r.timeAgo}
+              {activities.map((r) => {
+                const tp = typePill(r.type);
+                const sp = statusPill(r.status);
+                return (
+                  <TableRow key={r.id} hover sx={{ "& td": { borderBottomColor: "rgba(0,0,0,0.06)" } }}>
+                    <TableCell>
+                      <Pill text={r.type} bg={tp.bg} fg={tp.fg} />
+                    </TableCell>
+                    <TableCell sx={{ fontWeight: 900 }}>{r.user}</TableCell>
+                    <TableCell sx={{ color: "text.secondary", fontWeight: 800 }}>{r.question}</TableCell>
+                    <TableCell>
+                      <Pill text={r.status} bg={sp.bg} fg={sp.fg} />
+                    </TableCell>
+                    <TableCell sx={{ fontWeight: 900 }}>{r.latency}</TableCell>
+                    <TableCell sx={{ fontWeight: 900 }}>{r.acc}</TableCell>
+                    <TableCell sx={{ color: "text.secondary", fontWeight: 800 }}>{r.time}</TableCell>
+                  </TableRow>
+                );
+              })}
+
+              {activities.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={7}>
+                    <Alert severity="info" sx={{ borderRadius: 2 }}>
+                      Chưa có dữ liệu hoạt động.
+                    </Alert>
                   </TableCell>
                 </TableRow>
-              ))}
+              )}
             </TableBody>
           </Table>
-        </TableContainer>
-
-        <Divider sx={{ mt: 2 }} />
-
-        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mt: 1.5 }}>
-          <Typography sx={{ color: "text.secondary", fontSize: 13 }}>
-            Hiển thị 1-{activity.length} trong tổng số {activity.length} hoạt động
-          </Typography>
-          <Stack direction="row" spacing={1}>
-            <Button variant="outlined" size="small" sx={{ borderRadius: 2, fontWeight: 800 }}>
-              Trước
-            </Button>
-            <Chip
-              label="1"
-              size="small"
-              sx={{
-                height: 28,
-                px: 0.5,
-                fontWeight: 900,
-                bgcolor: "rgba(16, 185, 129, 0.14)",
-                border: "1px solid rgba(16, 185, 129, 0.22)",
-                color: "#0f766e",
-              }}
-            />
-            <Button variant="outlined" size="small" sx={{ borderRadius: 2, fontWeight: 800 }}>
-              Sau
-            </Button>
-          </Stack>
-        </Stack>
+        </Box>
       </Paper>
     </Box>
   );
